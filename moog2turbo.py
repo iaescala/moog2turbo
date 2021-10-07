@@ -89,8 +89,18 @@ def barklem(tab, root=os.getcwd()):
         ww = np.where( (np.abs(waverror) < 5.e-6) & (species_bk == species_moog[j]) )[0]
         #ww = np.where( (wavediff == 0.) & (species_bk == species_moog[watom][j]) )[0]
         
+        #No matches in Barklem.dat
         if len(ww) == 0: 
+            
+            #Use the approximation from line 166 in Damping.f in MOOG in the case where
+            #GAMRAD = 0, to circumvent the approximation used in line 999 of bsyn.f
+            #in Turbospectrum, which depends on the GU parameter
+            #P.S. we don't know where this constant comes from
+            gamrad[j] = 2.223e15/tab["wave"][watom][j]**2
+            
             continue
+            
+        #Multiple matches (based on the wavelength)
         elif len(ww) > 1:
             ww = ww[np.argmin(waverror[ww])]
         else: 
@@ -107,6 +117,7 @@ def barklem(tab, root=os.getcwd()):
         gamrad[j] = tabbk["gammarad"][nummin:nummax+1][ww]
         
         jhi[j] = tabbk["jhi"][nummin:nummax+1][ww]
+        
         
     tab["fdamp"] = gambark
     tab["raddamp"] = gamrad
