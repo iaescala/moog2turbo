@@ -7,7 +7,7 @@ without sourcing additional information from e.g. VALD
 Pulls total angular momentum quantum numbers from Barklem et al. 2000, 2005
 (same source as Barklem.dat in MOOG according to Gammabark.f)
 
-Note that the formatting in the convert_moog_linelist() function is 
+Note that the formatting in the convert_moog_linelist() function is
 heavily based on Alex Ji's turbopy/linelists.py
 """
 
@@ -20,7 +20,7 @@ def load_barklem(root=os.getcwd()):
     """"
     Read in the Barklem data
     """
-    
+
     data = []
     with open(os.path.join(root,"Barklem.dat"), "r") as f:
         lines = f.readlines()
@@ -50,7 +50,7 @@ def barklem(tab, root=os.getcwd()):
     Load the data from Barklem.dat in MOOG and match the data
     to the linelist following Gammabark.f
     """
-    
+
     tabbk = load_barklem(root=root)
     tabbk = get_Jnumber(tabbk, root=root)
 
@@ -71,10 +71,10 @@ def barklem(tab, root=os.getcwd()):
     jhi = np.zeros(tab["wave"].size)
 
     watom = tab["species_moog"].astype(float) < 100.
-    
+
     species_moog = tab["species_moog"][watom].astype(float)
     species_bk = tabbk["idbk"][nummin:nummax+1]
-    
+
     #species_moog = 10. * tab["species_moog"][watom].astype(float) + 0.0001
     #species_moog = species_moog.astype(int)
     #species_bk = 10. * tabbk["idbk"][nummin:nummax+1] + 0.001
@@ -85,26 +85,26 @@ def barklem(tab, root=os.getcwd()):
 
         waverror = (tab["wave"][watom][j] - tabbk["wavebk"][nummin:nummax+1])/tabbk["wavebk"][nummin:nummax+1]
         #wavediff = tab["wave"][watom][j] - tabbk["wavebk"][nummin:nummax+1]
-        
+
         ww = np.where( (np.abs(waverror) < 5.e-6) & (species_bk == species_moog[j]) )[0]
         #ww = np.where( (wavediff == 0.) & (species_bk == species_moog[watom][j]) )[0]
-        
+
         #No matches in Barklem.dat
-        if len(ww) == 0: 
-            
+        if len(ww) == 0:
+
             #Use the approximation from line 166 in Damping.f in MOOG in the case where
             #GAMRAD = 0, to circumvent the approximation used in line 999 of bsyn.f
             #in Turbospectrum, which depends on the GU parameter
             #P.S. we don't know where this constant comes from
             gamrad[j] = 2.223e15/tab["wave"][watom][j]**2
-            
+
             continue
-            
+
         #Multiple matches (based on the wavelength)
         elif len(ww) > 1:
             ww = ww[np.argmin(waverror[ww])]
-        else: 
-            ww = ww[0]     
+        else:
+            ww = ww[0]
 
         #X < 0 where X = a Van der Waals damping parameter
         #implies the parameter is log(FWHM) -- as is used by VALD2
@@ -115,10 +115,10 @@ def barklem(tab, root=os.getcwd()):
         #alpbark[j] = (1. - tabbk["alphabk"][k])/2
 
         gamrad[j] = tabbk["gammarad"][nummin:nummax+1][ww]
-        
+
         jhi[j] = tabbk["jhi"][nummin:nummax+1][ww]
-        
-        
+
+
     tab["fdamp"] = gambark
     tab["raddamp"] = gamrad
     tab["jhi"] = jhi
@@ -128,51 +128,51 @@ def barklem(tab, root=os.getcwd()):
 
 
 def get_Jnumber(tab_bk, root=os.getcwd()):
-    
+
     #tab_j = np.loadtxt(os.path.join(root, "Barklem_2000.txt"), skiprows=22,
-    #                   usecols=(0,1,3), 
+    #                   usecols=(0,1,3),
     #                   dtype={'names': ('species', 'wave', 'jhi'),
     #                        'formats': ('f4', 'f4', 'f4')})
-    
+
     #Read in the two Barklem data sets
     tab00 = Table.read(os.path.join(root, "Barklem_2000.fits"))
     tab05 = Table.read(os.path.join(root, "Barklem_2005.fits"))
-    
+
     #Rename the relevant columns and join the tables
     tab05['Ion'].name = 'spec'
     tab05['Jupp'].name = 'uppJ'
-    
+
     tab_j = Table()
     tab_j['lambda'] = np.concatenate((tab00['lambda'], tab05['lambda']))
     tab_j['spec'] = np.concatenate((tab00['spec'], tab05['spec']))
     tab_j['uppJ'] = np.concatenate((tab00['uppJ'], tab05['uppJ']))
-    
+
     #Some re-formatting the species ID in the Barklem data from Vizier
     spec_str_len = np.array([len(str(x)) for x in tab_j['spec']])
     wion = spec_str_len == 5
     tab_j['spec'][wion] = np.round(tab_j['spec'][wion]+0.09,decimals=1)
-    
+
     #Perform the matching for the J number
     jhi = np.zeros(tab_bk["wavebk"].size)
-    
+
     for i in range(tab_bk['wavebk'].size):
-    
+
         waverror = (tab_j["lambda"] - tab_bk["wavebk"][i])/tab_bk["wavebk"][i]
 
         ww = np.where( (np.abs(waverror) < 5.e-6) &\
                       (tab_j['spec'] == tab_bk['idbk'][i] ) )[0]
 
-        if len(ww) == 0: 
+        if len(ww) == 0:
             continue
         elif len(ww) > 1:
             ww = ww[np.argmin(waverror[ww])]
-        else: 
-            ww = ww[0]  
-            
+        else:
+            ww = ww[0]
+
         jhi[i] = tab_j['uppJ'][ww]
-        
+
     tab_bk["jhi"] = jhi
-    
+
     return tab_bk
 
 
@@ -180,7 +180,7 @@ def load_moog_list(filename, skipheader=1, root=os.getcwd()):
     """"
     Load in the MOOG format linelist
     """
-    
+
     with open(os.path.join(root, filename), "r") as f:
 
         lines = f.readlines()
@@ -192,29 +192,44 @@ def load_moog_list(filename, skipheader=1, root=os.getcwd()):
             l_strip = line.strip().split()
 
             if len(l_strip) == 4: #an atom
+
                 wave, species, expot, loggf = l_strip
                 d0 = -99.99
-                ion = int(species[-1])+1
+                unsold = -99.99
 
-            if len(l_strip) == 5: #a molecule
-                wave, species, expot, loggf, d0 = l_strip
-                ion = 1
+            if len(l_strip) == 5: #a molecule, OR an atom with an unsold factor specified (dampingopt = 0)
+
+                wave, species, expot, loggf, unsold_or_d0 = l_strip
+
+                if float(species) > 100.: # a molecule
+                    d0 = unsold_or_d0
+                    unsold = -99.99
+
+                else: #an atom with unsold factor specified
+                    d0 = -99.99
+                    unsold = unsold_or_d0
+
+            ion_iso = species.split('.')[-1]
+            if len(ion_iso) > 1:
+                ion = int(ion_iso[0])+1
+            else:
+                ion = int(ion_iso)+1
 
             data.append((float(wave), species, ion, float(expot), float(loggf), float(d0)))
 
     cols = ["wave", "species_moog", "ion", "expot", "loggf", "d0"]
     tab = Table(rows=data, names=cols)
-        
+
     return tab
-    
-    
+
+
 def convert_moog_linelist(filename, skipheader=1, outfilename=None, root=os.getcwd()):
-    
+
     """
     Note: It is recommended that you merge your standard MOOG linelist and strong MOOG linelist
     into a single list prior to performing this conversion
     """
-    
+
     tab = load_moog_list(filename, skipheader=skipheader, root=root)
 
     #Get the species in a format for Turbospectrum
@@ -233,13 +248,18 @@ def convert_moog_linelist(filename, skipheader=1, outfilename=None, root=os.getc
     tab["sortspecies"] = tab["species"].astype(float) + 0.0000001 * tab["ion"]
     tab.sort(["sortspecies", "wave"])
 
+    #Remove bad entries that TS doesn't like
+    iibad = (tab["sortspecies"] < 3) | (tab["ion"] > 2) | (tab["ion"] < 1) | \
+            (tab["expot"] > 15.) | (tab["loggf"] < -10.) | (tab["loggf"] > 100.)
+    tab = tab[~iibad]
+
     ## Parameters that require sourcing from elsewhere: fdamp, gu, raddamp
     tabbk = barklem(tab, root=root)
 
     tab["gu"] = tabbk["gu"]
     tab["fdamp"] = tabbk["fdamp"]
     tab["raddamp"] = tabbk["raddamp"]
-        
+
     if outfilename is not None:
 
         if os.path.exists(os.path.join(root, outfilename)):
@@ -261,5 +281,5 @@ def convert_moog_linelist(filename, skipheader=1, outfilename=None, root=os.getc
                     #fmt = "{wave:10.3f} {expot:6.3f} {loggf:6.3f} {fdamp:8.3f} {gu:6.1f} {raddmp:9.2e} '{levlo}' '{levup}'"
                     write(f"{row['wave']:10.3f} {row['expot']:6.3f} {row['loggf']:6.3f} {row['fdamp']:8.3f} "+\
                           f"{row['gu']:6.1f} {row['raddamp']:9.2e} 'X' 'X'")
-    
+
     return tab
