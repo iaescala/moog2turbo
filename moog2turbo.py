@@ -222,6 +222,35 @@ def load_moog_list(filename, skipheader=1, root=os.getcwd()):
 
     return tab
 
+def convert_species_format(tab):
+
+    #Get the species in a format for Turbospectrum
+    watom = tab["species_moog"].astype(float) < 100.
+    species = np.zeros(tab["wave"].size)
+
+    species[watom] = tab["species_moog"][watom] #atom designation is fine
+    species_molec = tab["species_moog"][~watom]
+
+    species_molec_ts = [] #conversion for molecular species desgination
+    for spec in species_molec:
+        ion_iso = spec.split('.')[-1]
+        if len(ion_iso) > 1:
+            els = spec.split('.')[0]
+            iso1, iso2 = ion_iso[1:3], ion_iso[3:5]
+            if iso1 == '01': iso1 = '00'
+            species_molec_ts.append( f"{els}.0{iso1}0{iso2}" )
+        else:
+            species_molec_ts.append( spec )
+
+    species[~watom] = species_molec_ts
+    tab["species"] = species
+
+    #Formatting
+    tab["species"][watom] = [f"{x:6.3f}" for x in tab["species"][watom]]
+    tab["species"][~watom] = [f"{x:10.6f}" for x in tab["species"][~watom]]
+
+    return tab
+
 
 def convert_moog_linelist(filename, skipheader=1, outfilename=None, root=os.getcwd()):
 
@@ -233,16 +262,7 @@ def convert_moog_linelist(filename, skipheader=1, outfilename=None, root=os.getc
     tab = load_moog_list(filename, skipheader=skipheader, root=root)
 
     #Get the species in a format for Turbospectrum
-    #watom = tab["d0"] == -99.99
-    watom = tab['species_moog'].astype(float) < 100.
-    species = np.zeros(tab["wave"].size)
-
-    species[watom] = np.floor(tab["species_moog"][watom].astype(float))
-    species[~watom] = tab["species_moog"][~watom].astype(float)
-    tab["species"] = species
-
-    #Formatting
-    tab["species"] = [f"{x:9.5f}" for x in tab["species"]]
+    tab = convert_species_format(tab)
 
     #Sort the table according to species, and then wavelength within a given species
     tab["sortspecies"] = tab["species"].astype(float) + 0.0000001 * tab["ion"]
