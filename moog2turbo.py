@@ -72,13 +72,13 @@ def barklem(tab, root=os.getcwd()):
 
     watom = tab["species_moog"].astype(float) < 100.
 
-    species_moog = tab["species_moog"][watom].astype(float)
-    species_bk = tabbk["idbk"][nummin:nummax+1]
+    #species_moog = tab["species_moog"][watom].astype(float)
+    #species_bk = tabbk["idbk"][nummin:nummax+1]
 
-    #species_moog = 10. * tab["species_moog"][watom].astype(float) + 0.0001
-    #species_moog = species_moog.astype(int)
-    #species_bk = 10. * tabbk["idbk"][nummin:nummax+1] + 0.001
-    #species_bk = species_bk.astype(int)
+    species_moog = 10. * tab["species_moog"][watom].astype(float) + 0.0001
+    species_moog = species_moog.astype(int)
+    species_bk = 10. * tabbk["idbk"][nummin:nummax+1] + 0.001
+    species_bk = species_bk.astype(int)
 
     #Do just for the atoms
     for j in range(tab["wave"][watom].size):
@@ -128,11 +128,6 @@ def barklem(tab, root=os.getcwd()):
 
 
 def get_Jnumber(tab_bk, root=os.getcwd()):
-
-    #tab_j = np.loadtxt(os.path.join(root, "Barklem_2000.txt"), skiprows=22,
-    #                   usecols=(0,1,3),
-    #                   dtype={'names': ('species', 'wave', 'jhi'),
-    #                        'formats': ('f4', 'f4', 'f4')})
 
     #Read in the two Barklem data sets
     tab00 = Table.read(os.path.join(root, "Barklem_2000.fits"))
