@@ -8,7 +8,10 @@ Pulls total angular momentum quantum numbers from Barklem et al. 2000, 2005
 (same source as Barklem.dat in MOOG according to Gammabark.f)
 
 Uses Barklem VdW parameter where available, or VdW parameter
-if specified in MOOG linelist following dampingopt = 1 (according to Damping.f)
+if specified in MOOG linelist following dampingopt = 1 (according to Damping.f).
+Includes optional keyword fdamp_flag = False (default), where
+fdamp_flag = True uses Unsold correction factors from vald3line-BPz-freeformat.f
+in Turbospectrum2019 where VdW is otherwise zero
 
 Note that the formatting in the convert_moog_linelist() function is
 heavily based on Alex P. Ji's turbopy/linelists.py
@@ -258,7 +261,8 @@ def convert_species_format(tab):
     return tab
 
 
-def convert_moog_linelist(filename, skipheader=0, outfilename=None, root=os.getcwd()):
+def convert_moog_linelist(filename, skipheader=0, outfilename=None, root=os.getcwd(),
+                          fdamp_flag=False):
 
     """
     Note: It is recommended that you merge your standard MOOG linelist and strong MOOG linelist
@@ -285,6 +289,32 @@ def convert_moog_linelist(filename, skipheader=0, outfilename=None, root=os.getc
     ## Corrective factors for Unsold approx in TS for 0 < VdW < 20
     wvdw = ~np.isnan(tab["vdw"]) & (tab["vdw"] > 0.) & (tab["vdw"] < 20.)
     tab["fdamp"][wvdw] = tab["vdw"][wvdw]
+
+    #If this flags is True, then use the Unsold correction factors
+    #specified in vald3line-BPz-freeformat.f in Turbospectrum2019 package
+    #Factors from BDP (A&A 275,101) Edvarsson et al. 1993
+    if fdamp_flag:
+
+        fdampdict1 = {11: 2.0, 14: 1.3, 20: 1.8, 26: 1.4} # neutral damping, the rest are 2.5
+        fdampdict2 = {20: 1.4, 38: 1.8, 56: 3.0} # ionized damping, the rest are 2.5
+        unsold_ts_factor = 2.5
+
+        wzero = tab["fdamp"] == 0.
+        fdamp_new = np.zeros(tab["fdamp"][wzero].size)
+        intspecies = tab["species"][wzero].astype(int)
+
+        for ii in range(tab["wave"][wzero].size):
+            #neutral damping
+            if tab["ion"][wzero][ii] == 1 and intspecies[ii] in fdampdict1:
+                fdamp_new[ii] = fdampdict1[intspecies[ii]]
+            #ionized damping
+            elif tab["ion"][wzero][ii] == 2 and intspecies[ii] in fdampdict2:
+                fdamp_new[ii] = fdampdict2[intspecies[ii]]
+            #everything else, including molecules
+            else:
+                fdamp_new[ii] = unsold_ts_factor
+
+        tab["fdamp"][wzero] = fdamp_new
 
     #Remove bad entries that TS doesn't like
     iibad = (tab["sortspecies"] < 3) | (tab["ion"] > 2) | (tab["ion"] < 1) | \
