@@ -7,8 +7,11 @@ without sourcing additional information from e.g. VALD
 Pulls total angular momentum quantum numbers from Barklem et al. 2000, 2005
 (same source as Barklem.dat in MOOG according to Gammabark.f)
 
+Uses Barklem VdW parameter where available, or VdW parameter
+if specified in MOOG linelist following dampingopt = 1 (according to Damping.f)
+
 Note that the formatting in the convert_moog_linelist() function is
-heavily based on Alex Ji's turbopy/linelists.py
+heavily based on Alex P. Ji's turbopy/linelists.py
 """
 
 import numpy as np
@@ -75,6 +78,7 @@ def barklem(tab, root=os.getcwd()):
     #species_moog = tab["species_moog"][watom].astype(float)
     #species_bk = tabbk["idbk"][nummin:nummax+1]
 
+    #This weirdness is to account for isotopes in the species designation
     species_moog = 10. * tab["species_moog"][watom].astype(float) + 0.0001
     species_moog = species_moog.astype(int)
     species_bk = 10. * tabbk["idbk"][nummin:nummax+1] + 0.001
@@ -89,7 +93,6 @@ def barklem(tab, root=os.getcwd()):
         ww = np.where( (np.abs(waverror) < 5.e-6) & (species_bk == species_moog[j]) )[0]
         #ww = np.where( (wavediff == 0.) & (species_bk == species_moog[watom][j]) )[0]
 
-        #No matches in Barklem.dat
         if len(ww) == 0:
 
             #Use the approximation from line 166 in Damping.f in MOOG in the case where
@@ -99,8 +102,6 @@ def barklem(tab, root=os.getcwd()):
             gamrad[j] = 2.223e15/tab["wave"][watom][j]**2
 
             continue
-
-        #Multiple matches (based on the wavelength)
         elif len(ww) > 1:
             ww = ww[np.argmin(waverror[ww])]
         else:
@@ -117,7 +118,6 @@ def barklem(tab, root=os.getcwd()):
         gamrad[j] = tabbk["gammarad"][nummin:nummax+1][ww]
 
         jhi[j] = tabbk["jhi"][nummin:nummax+1][ww]
-
 
     tab["fdamp"] = gambark
     tab["raddamp"] = gamrad
@@ -171,7 +171,7 @@ def get_Jnumber(tab_bk, root=os.getcwd()):
     return tab_bk
 
 
-def load_moog_list(filename, skipheader=1, root=os.getcwd()):
+def load_moog_list(filename, skipheader=0, root=os.getcwd()):
     """"
     Load in the MOOG format linelist
     """
@@ -189,20 +189,20 @@ def load_moog_list(filename, skipheader=1, root=os.getcwd()):
             if len(l_strip) == 4: #an atom
 
                 wave, species, expot, loggf = l_strip
-                d0 = -99.99
-                unsold = -99.99
+                d0 = np.nan
+                vdw = np.nan
 
-            if len(l_strip) == 5: #a molecule, OR an atom with an unsold factor specified (dampingopt = 0)
+            if len(l_strip) == 5: #a molecule, OR an atom with an VdW factor specified (dampingopt = 1)
 
-                wave, species, expot, loggf, unsold_or_d0 = l_strip
+                wave, species, expot, loggf, vdw_or_d0 = l_strip
 
                 if float(species) > 100.: # a molecule
-                    d0 = unsold_or_d0
-                    unsold = -99.99
+                    d0 = vdw_or_d0
+                    vdw = np.nan
 
                 else: #an atom with unsold factor specified
-                    d0 = -99.99
-                    unsold = unsold_or_d0
+                    d0 = np.nan
+                    vdw = vdw_or_d0
 
             ion_iso = species.split('.')[-1]
             if len(ion_iso) > 1:
@@ -210,12 +210,13 @@ def load_moog_list(filename, skipheader=1, root=os.getcwd()):
             else:
                 ion = int(ion_iso)+1
 
-            data.append((float(wave), species, ion, float(expot), float(loggf), float(d0)))
+            data.append((float(wave), species, ion, float(expot), float(loggf), float(vdw), float(d0)))
 
-    cols = ["wave", "species_moog", "ion", "expot", "loggf", "d0"]
+    cols = ["wave", "species_moog", "ion", "expot", "loggf", "vdw", "d0"]
     tab = Table(rows=data, names=cols)
 
     return tab
+
 
 def convert_species_format(tab):
 
@@ -223,10 +224,19 @@ def convert_species_format(tab):
     watom = tab["species_moog"].astype(float) < 100.
     species = np.zeros(tab["wave"].size)
 
-    species[watom] = tab["species_moog"][watom] #atom designation is fine
+    #if no isotope specified, floor the atomic species (e.g. 25.1 --> 25.0)
+    species_atom = np.floor(tab["species_moog"][watom].astype(float))
+    #if isotope specified, then keep the same
+    wiso = np.array([len(x.split('.')[-1]) > 1 for x in tab["species_moog"][watom]])
+    species_atom[wiso] = tab["species_moog"][watom][wiso].astype(float)
+
+    #Assign the atomic species to the new TS species array
+    species[watom] = species_atom
+
+    #Molecular species
     species_molec = tab["species_moog"][~watom]
 
-    species_molec_ts = [] #conversion for molecular species desgination
+    species_molec_ts = []
     for spec in species_molec:
         ion_iso = spec.split('.')[-1]
         if len(ion_iso) > 1:
@@ -237,7 +247,8 @@ def convert_species_format(tab):
         else:
             species_molec_ts.append( spec )
 
-    species[~watom] = species_molec_ts
+    #Assign the molecular species to the new TS species array
+    species[~watom] = np.array(species_molec_ts).astype(float)
     tab["species"] = species
 
     #Formatting
@@ -247,7 +258,7 @@ def convert_species_format(tab):
     return tab
 
 
-def convert_moog_linelist(filename, skipheader=1, outfilename=None, root=os.getcwd()):
+def convert_moog_linelist(filename, skipheader=0, outfilename=None, root=os.getcwd()):
 
     """
     Note: It is recommended that you merge your standard MOOG linelist and strong MOOG linelist
@@ -256,17 +267,11 @@ def convert_moog_linelist(filename, skipheader=1, outfilename=None, root=os.getc
 
     tab = load_moog_list(filename, skipheader=skipheader, root=root)
 
-    #Get the species in a format for Turbospectrum
     tab = convert_species_format(tab)
 
     #Sort the table according to species, and then wavelength within a given species
     tab["sortspecies"] = tab["species"].astype(float) + 0.0000001 * tab["ion"]
     tab.sort(["sortspecies", "wave"])
-
-    #Remove bad entries that TS doesn't like
-    iibad = (tab["sortspecies"] < 3) | (tab["ion"] > 2) | (tab["ion"] < 1) | \
-            (tab["expot"] > 15.) | (tab["loggf"] < -10.) | (tab["loggf"] > 100.)
-    tab = tab[~iibad]
 
     ## Parameters that require sourcing from elsewhere: fdamp, gu, raddamp
     tabbk = barklem(tab, root=root)
@@ -274,6 +279,17 @@ def convert_moog_linelist(filename, skipheader=1, outfilename=None, root=os.getc
     tab["gu"] = tabbk["gu"]
     tab["fdamp"] = tabbk["fdamp"]
     tab["raddamp"] = tabbk["raddamp"]
+
+    ##If a corrective factor is provided in the MOOG linelist, use this instead
+    ## (assuming dampingopt = 1)
+    ## Corrective factors for Unsold approx in TS for 0 < VdW < 20
+    wvdw = ~np.isnan(tab["vdw"]) & (tab["vdw"] > 0.) & (tab["vdw"] < 20.)
+    tab["fdamp"][wvdw] = tab["vdw"][wvdw]
+
+    #Remove bad entries that TS doesn't like
+    iibad = (tab["sortspecies"] < 3) | (tab["ion"] > 2) | (tab["ion"] < 1) | \
+            (tab["expot"] > 15.) | (tab["loggf"] < -10.) | (tab["loggf"] > 100.)
+    tab = tab[~iibad]
 
     if outfilename is not None:
 
