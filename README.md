@@ -7,6 +7,10 @@ Pulls total angular momentum quantum numbers from Barklem et al. 2000, 2005
 Uses Barklem VdW parameter where available, or VdW parameter
 if specified in MOOG linelist following dampingopt = 1 (according to Damping.f)
 
+Includes optional keyword fdamp_flag = False (default), where
+fdamp_flag = True uses Unsold correction factors from vald3line-BPz-freeformat.f
+in Turbospectrum2019 where VdW is otherwise zero
+
 Note that the formatting in the convert_moog_linelist() function is 
 heavily based on Alex P. Ji's turbopy/linelists.py
 
