@@ -297,24 +297,20 @@ def convert_moog_linelist(filename, skipheader=0, outfilename=None, root=os.getc
 
         fdampdict1 = {11: 2.0, 14: 1.3, 20: 1.8, 26: 1.4} # neutral damping, the rest are 2.5
         fdampdict2 = {20: 1.4, 38: 1.8, 56: 3.0} # ionized damping, the rest are 2.5
-        unsold_ts_factor = 2.5
+        unsold_ts_factor = 2.5 #everything else
 
-        wzero = tab["fdamp"] == 0.
-        fdamp_new = np.zeros(tab["fdamp"][wzero].size)
-        intspecies = tab["species"][wzero].astype(int)
+        intspecies = tab["species"].astype(int)
 
-        for ii in range(tab["wave"][wzero].size):
-            #neutral damping
-            if tab["ion"][wzero][ii] == 1 and intspecies[ii] in fdampdict1:
-                fdamp_new[ii] = fdampdict1[intspecies[ii]]
-            #ionized damping
-            elif tab["ion"][wzero][ii] == 2 and intspecies[ii] in fdampdict2:
-                fdamp_new[ii] = fdampdict2[intspecies[ii]]
-            #everything else, including molecules
-            else:
-                fdamp_new[ii] = unsold_ts_factor
+        for key in fdampdict1.keys():
+            wkey = (tab["fdamp"] == 0.) & (intspecies == key) & (tab["ion"] == 1)
+            tab["fdamp"][wkey] = fdampdict1[key]
 
-        tab["fdamp"][wzero] = fdamp_new
+        for key in fdampdict2.keys():
+            wkey = (tab["fdamp"] == 0.) & (intspecies == key) & (tab["ion"] == 2)
+            tab["fdamp"][wkey] = fdampdict2[key]
+
+        w_still_zero = tab["fdamp"] == 0.
+        tab["fdamp"][w_still_zero] = unsold_ts_factor
 
     #Remove bad entries that TS doesn't like
     iibad = (tab["sortspecies"] < 3) | (tab["ion"] > 2) | (tab["ion"] < 1) | \
