@@ -22,6 +22,31 @@ import os
 from astropy.table import Table
 from astropy.io import fits
 
+def get_elem(species, ion):
+    _all_elems = ["H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar",
+                  "K","Ca","Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr",
+                  "Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe",
+                  "Cs","Ba","La","Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu",
+                  "Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","At","Rn",
+                  "Fr","Ra","Ac","Th","Pa","U"]
+    _ion_state = ["I", "II"]
+    _swap = ["NH", "NC"]
+
+    intspecies = int(species)
+    if intspecies < 100: #if an atom
+        return f"{_all_elems[intspecies-1]} {_ion_state[ion-1]}"
+    else: #if a diatomic molecule
+        strspecies = str(intspecies)
+        species_lo, species_hi = strspecies[0], strspecies[1:]
+        Z_lo, Z_hi = _all_elems[int(species_lo)-1], _all_elems[int(species_hi)-1]
+        if Z_lo != Z_hi:
+            if f"{Z_hi}{Z_lo}" in _swap:
+                Z_hi, Z_lo = Z_lo, Z_hi
+            return f"{Z_hi}{Z_lo} {_ion_state[ion-1]}"
+        else:
+            return f"{Z_lo}2 {_ion_state[ion-1]}"
+
+
 def load_barklem(root=os.getcwd()):
     """"
     Read in the Barklem data
@@ -332,7 +357,9 @@ def convert_moog_linelist(filename, skipheader=0, outfilename=None, root=os.getc
                 t = tab[tab["sortspecies"]==sortspecies]
                 N = len(t)
                 write(f"' {t[0]['species']}'      {t[0]['ion']}       {N}")
-                write(f"'Comment'")
+
+                elem_str = get_elem(t[0]['species'], t[0]['ion'])
+                write(f"' {elem_str}'")
 
                 for row in t:
                     #fmt = "{wave:10.3f} {expot:6.3f} {loggf:6.3f} {fdamp:8.3f} {gu:6.1f} {raddmp:9.2e} '{levlo}' '{levup}'"
