@@ -147,6 +147,11 @@ def barklem(tab, root=os.getcwd()):
 
         jhi[j] = tabbk["jhi"][nummin:nummax+1][ww]
 
+    #Molecules
+    wzero = gamrad == 0.
+    gamrad[wzero] = 2.223e15/tab["wave"][wzero]**2.
+
+
     tab["fdamp"] = gambark
     tab["raddamp"] = gamrad
     tab["jhi"] = jhi
