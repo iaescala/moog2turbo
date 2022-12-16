@@ -16,4 +16,4 @@ heavily based on Alex P. Ji's turbopy/linelists.py
 
 It is recommended that you merge your standard MOOG linelist and strong linelist prior to conversion
 
-For now, if you use this code in your research, please cite Escala et al. 2022, in prep, and link to this repository.
+For now, if you use this code in your research, please cite Escala et al. 2023, in prep, and link to this repository.
